@@ -26,7 +26,7 @@ stats_cleaned
 scrape_espn_season <- function(year) {
   message("Scraping season: ", year)
   
-  url <- sprintf("https://www.espn.com/nfl/stats/player/_/stat/rushing/season/2025/seasontype/2", year)
+  url <- sprintf("https://www.espn.com/nfl/stats/player/_/stat/rushing/season/%d/seasontype/2", year)
   
   req <- request(url)
   page <- req_perform(req) |> resp_body_html()
@@ -70,5 +70,29 @@ master_multi_year_data <- map_dfr(years, scrape_espn_season)
 print(master_multi_year_data)
 
 
+# EDA
 
-# Debate on adding other POS
+# Looking at the top 10 player with the most yards
+Data2025 <- map_dfr(2025, scrape_espn_season)
+Data2025 |> slice_max(YDS, n = 5) |>  # Show top 5 players
+  ggplot(aes(x = Player, y = YDS)) + geom_col()
+
+
+# Looking at the top 10 player with the most fumbles
+Data2025 <- map_dfr(2025, scrape_espn_season)
+Data2025 |> slice_max(FUM, n = 5) |>  # Show top 5 players
+  ggplot(aes(x = Player, y = FUM)) + geom_col()
+
+# Looking at the top 10 player with the most fumbles
+Data2025 <- map_dfr(2025, scrape_espn_season)
+Data2025 |> slice_max(ATT, n = 5) |>  # Show top 5 players
+  ggplot(aes(x = Player, y = ATT)) + geom_col()
+
+
+# Looking at the numbers of fumbles and ranking them is unfair to the ones that run the ball more
+# So we are going to do the proporation 
+Data2025 <- map_dfr(2025, scrape_espn_season)
+Data2025 |> mutate(prop = FUM / ATT) |> slice_max(prop, n = 5) |>  # Show top 5 players
+  ggplot(aes(x = reorder(Player, prop), y = prop)) + geom_col(). # Looked up reorder to make the bars go in order
+
+# You can see in 2025 josh Allen had the highest fumbles ratio based on the number of attempts
