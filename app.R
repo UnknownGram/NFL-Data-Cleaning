@@ -4,6 +4,13 @@ library(httr2)
 library(rvest)
 library(tidyverse)
 
+
+# Added this so the graph can help team color
+nfl_teams <- c("ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB",
+               "HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG",
+               "NYJ","PHI","PIT","SEA","SF","TB","TEN","WSH")
+team_regex <- paste0("(", paste(nfl_teams, collapse = "|"), ")$")
+
 # Making a function so all i have to do is put in the year to get the clean data
 scrape_espn_season <- function(year) {
   message("Scraping season: ", year)
@@ -33,9 +40,8 @@ scrape_espn_season <- function(year) {
     mutate(
       Season = year,
       Rank   = suppressWarnings(as.integer(RK)),
-      Team   = str_extract(Name, "[A-Z]+$"),
-      Player = str_remove(Name, "\\s+[A-Z]+$"),
-      Player = str_sub(Player, 1, -4)  # Removes the team name from players names
+      Team   = str_extract(Name, team_regex),
+      Player = str_remove(Name, team_regex)  # Removes the team name from players names
     ) |> 
     select(Season, Rank, Player, Team, POS, everything(), -RK, -Name)
   
@@ -57,38 +63,45 @@ library(shiny)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("NFL DATA"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            selectInput("years",
-                        "Pick a Year:",
-                        choices = years,
-                        selected = 2025
-        ),
-        
-        selectInput(
-          "stat",
-          "Pick a Stat:",
-          choices = c("Rushing Yards" = "YDS", 
-                      "Touchdowns"    = "TD", 
-                      "Attempts"      = "ATT", 
-                      "Yards/Carry"   = "AVG"),
-          selected = "YDS"
-        )
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-          tabsetPanel(
-            tabPanel("Plot Title", plotOutput("rushingPlot")),
-            tabPanel("Table Title", tableOutput("rushingTable")) # or DT::DTOutput
-          )
-        )
+  
+  # Application title
+  titlePanel("NFL DATA"),
+  
+  # Sidebar with a slider input for number of bins 
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("years",
+                  "Pick a Year:",
+                  choices = years,
+                  selected = 2025
+      ),
+      
+      selectInput(
+        "stat",
+        "Pick a Stat:",
+        choices = c("Rushing Yards" = "YDS", 
+                    "Touchdowns"    = "TD", 
+                    "Attempts"      = "ATT", 
+                    "Yards/Carry"   = "AVG"),
+        selected = "YDS"
+      )
+    ),
+    
+    # Show a plot of the generated distribution
+    mainPanel(
+      tabsetPanel(
+        id = "tabs",
+        tabPanel("Season Leaders", plotOutput("rushingPlot")),
+        tabPanel("Player Trends",
+                 selectizeInput("players", "Compare players (up to 5):",  # I read on tbe selectizeInput function
+                                choices = sort(unique(master_multi_year_data$Player)),   # Collects all the players names for the graph
+                                multiple = TRUE,   # This allows multiple players to be selected at the same time
+                                options = list(maxItems = 5)),  # Compare up to 5 players
+                 plotOutput("trendPlot")),
+        tabPanel("Full Table", tableOutput("rushingTable"))
+      )
     )
+  )
 )
 
 server <- function(input, output) {
@@ -114,6 +127,23 @@ server <- function(input, output) {
       labs(
         title = sprintf("Top 10 Rushing Leaders (%s)", input$years),
         x = NULL,
+        y = input$stat
+      )
+  })
+  
+  output$trendPlot <- renderPlot({
+    req(input$players)
+    
+    master_multi_year_data |> 
+      filter(Player %in% input$players) |> 
+      complete(Player, Season = years) |> 
+      ggplot(aes(x = Season, y = .data[[input$stat]], color = Player)) +
+      geom_line(linewidth = 1.2) +
+      geom_point(size = 3) + 
+      scale_x_continuous(breaks = years) +
+      labs(
+        title = "Player Trends",
+        x = "Season",
         y = input$stat
       )
   })

@@ -4,6 +4,12 @@ library(httr2)
 library(rvest)
 library(tidyverse)
 
+# Added this so the graph can help team color. Also made it easier to remove the team name from player name
+nfl_teams <- c("ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB",
+               "HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG",
+               "NYJ","PHI","PIT","SEA","SF","TB","TEN","WSH")
+team_regex <- paste0("(", paste(nfl_teams, collapse = "|"), ")$")
+
 # Testing Webscaping
 url <- sprintf("https://www.espn.com/nfl/stats/player/_/stat/rushing/season/2025/seasontype/2")
 
@@ -51,9 +57,8 @@ scrape_espn_season <- function(year) {
     mutate(
       Season = year,
       Rank   = suppressWarnings(as.integer(RK)),
-      Team   = str_extract(Name, "[A-Z]+$"),
-      Player = str_remove(Name, "\\s+[A-Z]+$"),
-      Player = str_sub(Player, 1, -4)  # Removes the team name from players names
+      Team   = str_extract(Name, team_regex),
+      Player = str_remove(Name, team_regex)  # Removes the team name from players names
     ) |> 
     select(Season, Rank, Player, Team, POS, everything(), -RK, -Name)
   
@@ -83,7 +88,7 @@ Data2025 <- map_dfr(2025, scrape_espn_season)
 Data2025 |> slice_max(FUM, n = 5) |>  # Show top 5 players
   ggplot(aes(x = Player, y = FUM)) + geom_col()
 
-# Looking at the top 10 player with the most fumbles
+# Looking at the top 10 player with the most attempted
 Data2025 <- map_dfr(2025, scrape_espn_season)
 Data2025 |> slice_max(ATT, n = 5) |>  # Show top 5 players
   ggplot(aes(x = Player, y = ATT)) + geom_col()
@@ -93,6 +98,6 @@ Data2025 |> slice_max(ATT, n = 5) |>  # Show top 5 players
 # So we are going to do the proporation 
 Data2025 <- map_dfr(2025, scrape_espn_season)
 Data2025 |> mutate(prop = FUM / ATT) |> slice_max(prop, n = 5) |>  # Show top 5 players
-  ggplot(aes(x = reorder(Player, prop), y = prop)) + geom_col(). # Looked up reorder to make the bars go in order
+  ggplot(aes(x = reorder(Player, prop), y = prop)) + geom_col() # Looked up reorder to make the bars go in order
 
 # You can see in 2025 josh Allen had the highest fumbles ratio based on the number of attempts
